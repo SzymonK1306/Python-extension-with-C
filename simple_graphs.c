@@ -1,5 +1,7 @@
 #include <Python.h>
 
+const int MAX_VERTICES = 16;
+
 // Define the struct
 typedef struct {
     PyObject_HEAD
@@ -24,14 +26,14 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     self->num_vertices = g6[0] - 63;
 
     // Allocate memory for the adjacency list
-    self->adj_list = (PyObject **)malloc(self->num_vertices * sizeof(PyObject *));
+    self->adj_list = (PyObject **)malloc(MAX_VERTICES * sizeof(PyObject *));
     if (self->adj_list == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory");
         return -1;
     }
 
     // Initialize adjacency lists as empty Python lists
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < MAX_VERTICES; ++i) {
         self->adj_list[i] = PyList_New(0);
         if (self->adj_list[i] == NULL) {
             PyErr_SetString(PyExc_RuntimeError, "Failed to create Python list");
@@ -40,14 +42,14 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     }
 
     // Decode g6 format and populate adjacency lists
-    int k = 1; // Index to traverse g6 string
-    int i = 0;
-    int c;
+    int k = 0; // Index to traverse g6 string
+    int i = 1;
     for (int v = 1; v < self->num_vertices; ++v) {
         for (int u = 0; u < v; ++u) {
+            int c;
             if (k==0)
             {
-                int c = g6[i] - 63;
+                c = g6[i] - 63;
                 i++;
                 k=6;
             }
@@ -90,7 +92,7 @@ static PyObject *number_of_vertices(AdjacencyList *self) {
 
 // Implementation of number_of_vertices method
 static PyObject *Alist(AdjacencyList *self) {
-    return self->adj_list[0];
+    return self->adj_list[15];
 }
 
 static PyObject *vertices(AdjacencyList *self) {
@@ -103,6 +105,7 @@ static PyObject *vertices(AdjacencyList *self) {
         {
             PyObject *item = PyLong_FromLong(i);
             PySet_Add(vertices_set, item);
+            Py_DECREF(item);
         };
     }
 
@@ -118,11 +121,76 @@ static PyObject *number_of_edges(AdjacencyList *self) {
     return PyLong_FromLong(sum);
 }
 
+static PyObject *edges(AdjacencyList *self) {
+    PyObject *edges_set = PySet_New(NULL);
+    if (edges_set == NULL) {
+        // Handle memory allocation failure
+        return NULL;
+    }
+
+    for (int i = 0; i < self->num_vertices; ++i) {
+        for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j) {
+            // Retrieve the vertex j from the adjacency list
+            PyObject *vertex_j = PyList_GetItem(self->adj_list[i], j);
+            if (vertex_j == NULL) {
+                // Handle error if PyList_GetItem fails
+                Py_DECREF(edges_set);
+                return NULL;
+            }
+            int smaller_vertex = i < PyLong_AsLong(vertex_j) ? i : PyLong_AsLong(vertex_j);
+            int larger_vertex = i < PyLong_AsLong(vertex_j) ? PyLong_AsLong(vertex_j) : i;
+
+            // Create a tuple (smaller_vertex, larger_vertex)
+            PyObject *edge = PyTuple_Pack(2, PyLong_FromLong(smaller_vertex), PyLong_FromLong(larger_vertex));
+
+            if (edge == NULL) {
+                // Handle error if PyTuple_Pack fails
+                Py_DECREF(edges_set);
+                return NULL;
+            }
+
+            // Add the tuple to the set
+            int result = PySet_Add(edges_set, edge);
+            Py_DECREF(edge); // We no longer need the reference to edge
+            if (result == -1) {
+                // Handle error if PySet_Add fails
+                Py_DECREF(edges_set);
+                return NULL;
+            }
+            Py_DECREF(vertex_j);
+        }
+    }
+    return edges_set;
+}
+
+static PyObject *is_edge(AdjacencyList *self, PyObject *args) {
+    int v, u;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "ii", &v, &u);
+    }
+    int number_of_neighbours = PyList_Size(self->adj_list[v]);
+    int result = 0;
+    for (int i=0; i < number_of_neighbours; ++i)
+    {
+        PyObject *vertex_i = PyList_GetItem(self->adj_list[v], i);
+        if (PyLong_AsLong(vertex_i) == u)
+        {
+            result = 1;
+            break;
+        }
+    }
+
+    return PyBool_FromLong(result);
+}
+
 // Define the methods
 static PyMethodDef AdjacencyList_methods[] = {
     {"number_of_vertices", (PyCFunction)number_of_vertices, METH_NOARGS},
     {"vertices", (PyCFunction)vertices, METH_NOARGS},
     {"number_of_edges", (PyCFunction)number_of_edges, METH_NOARGS},
+    {"edges", (PyCFunction)edges, METH_NOARGS},
+    {"is_edge", (PyCFunction)is_edge, METH_VARARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
 };
