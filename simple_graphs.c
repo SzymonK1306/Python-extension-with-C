@@ -5,6 +5,7 @@ const int MAX_VERTICES = 16;
 // Define the struct
 typedef struct {
     PyObject_HEAD
+    short vertices;
     int num_vertices;
     PyObject **adj_list; // Array of Python lists (sorted adjacency lists)
 } AdjacencyList;
@@ -24,6 +25,11 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     // Determine the number of vertices from g6 format
     int len = strlen(g6);
     self->num_vertices = g6[0] - 63;
+
+    for (int i = 0; i < g6[0] - 63; i++) {
+        self->vertices = self->vertices << 1;
+        self->vertices = self->vertices | 0x0001;
+    }
 
     // Allocate memory for the adjacency list
     self->adj_list = (PyObject **)malloc(MAX_VERTICES * sizeof(PyObject *));
@@ -59,12 +65,6 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
                 PyList_Append(self->adj_list[u], PyLong_FromLong(v));
                 PyList_Append(self->adj_list[v], PyLong_FromLong(u));
             }
-            // if ((g6[k] >> (5 - (u % 6))) & 1) {
-            //     // There is an edge between u and v
-            //     PyList_Append(self->adj_list[u], PyLong_FromLong(v));
-            //     PyList_Append(self->adj_list[v], PyLong_FromLong(u));
-            // }
-            // if (++k == len) break; // Ensure not to exceed the length of g6
         }
     }
 
@@ -184,6 +184,21 @@ static PyObject *is_edge(AdjacencyList *self, PyObject *args) {
     return PyBool_FromLong(result);
 }
 
+static PyObject *vertex_degree(AdjacencyList *self, PyObject *args) {
+    int v;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "i", &v);
+    }
+
+    int degree = PyList_Size(self->adj_list[v]);
+    return PyLong_FromLong(degree);
+}
+
+static PyObject *get_ver(AdjacencyList *self) {
+    return PyLong_FromLong(self->vertices);
+}
+
 // Define the methods
 static PyMethodDef AdjacencyList_methods[] = {
     {"number_of_vertices", (PyCFunction)number_of_vertices, METH_NOARGS},
@@ -191,7 +206,9 @@ static PyMethodDef AdjacencyList_methods[] = {
     {"number_of_edges", (PyCFunction)number_of_edges, METH_NOARGS},
     {"edges", (PyCFunction)edges, METH_NOARGS},
     {"is_edge", (PyCFunction)is_edge, METH_VARARGS},
+    {"vertex_degree", (PyCFunction)vertex_degree, METH_VARARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
+    {"get_ver", (PyCFunction)get_ver, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
 };
 
