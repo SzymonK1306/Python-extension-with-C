@@ -329,6 +329,23 @@ static PyObject *delete_edge(AdjacencyList *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *degree_sequence(AdjacencyList *self) {
+    PyObject *degree_sequence_list = PyList_New(0);
+
+    short num = self->vertices;
+    for (int i = 0; i < MAX_VERTICES; ++i) {
+        if ((num >> i) & 1) 
+        {
+            int degree = PyList_Size(self->adj_list[i]);
+            PyList_Append(degree_sequence_list, PyLong_FromLong(degree));
+        }
+    }
+    PyList_Sort(degree_sequence_list);
+    PyList_Reverse(degree_sequence_list);
+
+    return degree_sequence_list;
+}
+
 static PyObject *get_ver(AdjacencyList *self) {
     return PyLong_FromLong(self->vertices);
 }
@@ -346,6 +363,7 @@ static PyMethodDef AdjacencyList_methods[] = {
     {"delete_vertex", (PyCFunction)delete_vertex, METH_VARARGS},
     {"add_edge", (PyCFunction)add_edge, METH_VARARGS},
     {"delete_edge", (PyCFunction)delete_edge, METH_VARARGS},
+    {"degree_sequence", (PyCFunction)degree_sequence, METH_NOARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
     {"get_ver", (PyCFunction)get_ver, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
