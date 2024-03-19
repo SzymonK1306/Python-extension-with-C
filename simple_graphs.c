@@ -6,13 +6,22 @@ const int MAX_VERTICES = 16;
 typedef struct {
     PyObject_HEAD
     short vertices;
-    int num_vertices;
+    // int num_vertices;
     PyObject **adj_list; // Array of Python lists (sorted adjacency lists)
 } AdjacencyList;
 
 // Comparator function for sorting
 int compare(const void *a, const void *b) {
     return (*(int*)a - *(int*)b);
+}
+
+int count_bits(short num) {
+    int count = 0;
+    while (num) {
+        count += num & 1; 
+        num >>= 1;        
+    }
+    return count;
 }
 
 // Define the initialization function
@@ -24,7 +33,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     
     // Determine the number of vertices from g6 format
     int len = strlen(g6);
-    self->num_vertices = g6[0] - 63;
+    // self->num_vertices = g6[0] - 63;
 
     for (int i = 0; i < g6[0] - 63; i++) {
         self->vertices = self->vertices << 1;
@@ -50,7 +59,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     // Decode g6 format and populate adjacency lists
     int k = 0; // Index to traverse g6 string
     int i = 1;
-    for (int v = 1; v < self->num_vertices; ++v) {
+    for (int v = 1; v < count_bits(self->vertices); ++v) {
         for (int u = 0; u < v; ++u) {
             int c;
             if (k==0)
@@ -69,7 +78,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     }
 
     // Sort adjacency lists
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < count_bits(self->vertices); ++i) {
         PyList_Sort(self->adj_list[i]);
     }
 
@@ -78,7 +87,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
 
 // Destructor to deallocate memory
 static void AdjacencyList_dealloc(AdjacencyList *self) {
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < count_bits(self->vertices); ++i) {
         Py_DECREF(self->adj_list[i]);
     }
     free(self->adj_list);
@@ -87,7 +96,7 @@ static void AdjacencyList_dealloc(AdjacencyList *self) {
 
 // Implementation of number_of_vertices method
 static PyObject *number_of_vertices(AdjacencyList *self) {
-    return PyLong_FromLong(self->num_vertices);
+    return PyLong_FromLong(count_bits(self->vertices));
 }
 
 // Implementation of number_of_vertices method
@@ -100,7 +109,7 @@ static PyObject *vertices(AdjacencyList *self) {
     if (!vertices_set) {
         return NULL;
     }
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < count_bits(self->vertices); ++i) {
         if (self->adj_list[i] != NULL)
         {
             PyObject *item = PyLong_FromLong(i);
@@ -114,7 +123,7 @@ static PyObject *vertices(AdjacencyList *self) {
 
 static PyObject *number_of_edges(AdjacencyList *self) {
     int sum = 0;
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < count_bits(self->vertices); ++i) {
         sum += PyList_Size(self->adj_list[i]);
     }
     sum = sum / 2;
@@ -128,7 +137,7 @@ static PyObject *edges(AdjacencyList *self) {
         return NULL;
     }
 
-    for (int i = 0; i < self->num_vertices; ++i) {
+    for (int i = 0; i < count_bits(self->vertices); ++i) {
         for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j) {
             // Retrieve the vertex j from the adjacency list
             PyObject *vertex_j = PyList_GetItem(self->adj_list[i], j);
@@ -195,6 +204,27 @@ static PyObject *vertex_degree(AdjacencyList *self, PyObject *args) {
     return PyLong_FromLong(degree);
 }
 
+static PyObject *vertex_neighbors(AdjacencyList *self, PyObject *args) {
+    int v;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "i", &v);
+    }
+
+    PyObject *neighbours_set = PySet_New(NULL);
+    if (!neighbours_set) {
+        return NULL;
+    }
+
+    for (int i = 0; i < PyList_Size(self->adj_list[v]); i++)
+    {
+        PyObject *vertex_i = PyList_GetItem(self->adj_list[v], i);
+        PySet_Add(neighbours_set, vertex_i);
+        Py_DECREF(vertex_i);
+    }
+    return neighbours_set;
+}
+
 static PyObject *get_ver(AdjacencyList *self) {
     return PyLong_FromLong(self->vertices);
 }
@@ -207,6 +237,7 @@ static PyMethodDef AdjacencyList_methods[] = {
     {"edges", (PyCFunction)edges, METH_NOARGS},
     {"is_edge", (PyCFunction)is_edge, METH_VARARGS},
     {"vertex_degree", (PyCFunction)vertex_degree, METH_VARARGS},
+    {"vertex_neighbors", (PyCFunction)vertex_neighbors, METH_VARARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
     {"get_ver", (PyCFunction)get_ver, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
