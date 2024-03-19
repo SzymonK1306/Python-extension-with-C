@@ -87,7 +87,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
 
 // Destructor to deallocate memory
 static void AdjacencyList_dealloc(AdjacencyList *self) {
-    for (int i = 0; i < count_bits(self->vertices); ++i) {
+    for (int i = 0; i < MAX_VERTICES; ++i) {
         Py_DECREF(self->adj_list[i]);
     }
     free(self->adj_list);
@@ -101,7 +101,7 @@ static PyObject *number_of_vertices(AdjacencyList *self) {
 
 // Implementation of number_of_vertices method
 static PyObject *Alist(AdjacencyList *self) {
-    return self->adj_list[15];
+    return self->adj_list[1];
 }
 
 static PyObject *vertices(AdjacencyList *self) {
@@ -109,14 +109,34 @@ static PyObject *vertices(AdjacencyList *self) {
     if (!vertices_set) {
         return NULL;
     }
-    for (int i = 0; i < count_bits(self->vertices); ++i) {
-        if (self->adj_list[i] != NULL)
-        {
+    short num = self->vertices;
+    // int i = MAX_VERTICES - 1;
+    // while (num) {
+    //     if (num & 1)
+    //     {
+    //         PyObject *item = PyLong_FromLong(i);
+    //         PySet_Add(vertices_set, item);
+    //         Py_DECREF(item);
+    //     }   
+    //     num >>= 1;    
+    // }
+
+    for (int i = 0; i < MAX_VERTICES; i++) {
+        if ((num >> i) & 1) {
             PyObject *item = PyLong_FromLong(i);
             PySet_Add(vertices_set, item);
             Py_DECREF(item);
-        };
+        }
     }
+    // for (int i = 0; i < MAX_VERTICES; ++i) {
+        
+    //     if (PyList_Size(self->adj_list[i]) != 0)
+    //     {
+    //         PyObject *item = PyLong_FromLong(i);
+    //         PySet_Add(vertices_set, item);
+    //         Py_DECREF(item);
+    //     };
+    // }
 
     return vertices_set;
 }
@@ -136,8 +156,7 @@ static PyObject *edges(AdjacencyList *self) {
         // Handle memory allocation failure
         return NULL;
     }
-
-    for (int i = 0; i < count_bits(self->vertices); ++i) {
+    for (int i = 0; i < MAX_VERTICES; ++i) {
         for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j) {
             // Retrieve the vertex j from the adjacency list
             PyObject *vertex_j = PyList_GetItem(self->adj_list[i], j);
@@ -225,6 +244,60 @@ static PyObject *vertex_neighbors(AdjacencyList *self, PyObject *args) {
     return neighbours_set;
 }
 
+static PyObject *add_vertex(AdjacencyList *self, PyObject *args) {
+    int v;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "i", &v);
+    }
+
+    short tmp = (0x0001 << v);
+    self->vertices = self->vertices | tmp;
+    return PyBool_FromLong(1);
+}
+
+static PyObject *delete_vertex(AdjacencyList *self, PyObject *args) {
+    int v;
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "i", &v);
+    }
+    Py_DECREF(self->adj_list[v]);
+    self->adj_list[v] = PyList_New(0);
+
+    for (int i = 0; i < MAX_VERTICES; i++)
+    {
+        if (PySequence_Contains(self->adj_list[i], PyLong_FromLong(v)))
+        {
+            int idx = PySequence_Index(self->adj_list[i], PyLong_FromLong(v));
+            if (idx != -1)
+            {
+                PyList_SetSlice(self->adj_list[i], idx, idx + 1, NULL);
+            }
+        }
+        // if (PyList_Size(self->adj_list[i]) == 0)
+        //     continue;
+        // PyObject *tmp_list = PyList_New(0);
+
+        // for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j)
+        // {
+        //     PyObject *cur_ver_obj = PyList_GetItem(self->adj_list[i], j);
+        //     int current_vertex = PyLong_AsLong(cur_ver_obj);
+        //     Py_DECREF(cur_ver_obj);
+
+        //     if (current_vertex != v)
+        //     {
+        //         PyList_Append(tmp_list, PyLong_FromLong(current_vertex));
+        //     }
+        // }
+        // Py_DECREF(self->adj_list[i]);
+        // self->adj_list[i] = tmp_list;
+        // Py_DECREF(tmp_list);
+    }
+
+    self->vertices &= ~(1 << v);
+    return PyBool_FromLong(1);
+}
+
 static PyObject *get_ver(AdjacencyList *self) {
     return PyLong_FromLong(self->vertices);
 }
@@ -238,6 +311,8 @@ static PyMethodDef AdjacencyList_methods[] = {
     {"is_edge", (PyCFunction)is_edge, METH_VARARGS},
     {"vertex_degree", (PyCFunction)vertex_degree, METH_VARARGS},
     {"vertex_neighbors", (PyCFunction)vertex_neighbors, METH_VARARGS},
+    {"add_vertex", (PyCFunction)add_vertex, METH_VARARGS},
+    {"delete_vertex", (PyCFunction)delete_vertex, METH_VARARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
     {"get_ver", (PyCFunction)get_ver, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
