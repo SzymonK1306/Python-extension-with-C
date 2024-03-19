@@ -253,7 +253,7 @@ static PyObject *add_vertex(AdjacencyList *self, PyObject *args) {
 
     short tmp = (0x0001 << v);
     self->vertices = self->vertices | tmp;
-    return PyBool_FromLong(1);
+    Py_RETURN_NONE;
 }
 
 static PyObject *delete_vertex(AdjacencyList *self, PyObject *args) {
@@ -295,7 +295,38 @@ static PyObject *delete_vertex(AdjacencyList *self, PyObject *args) {
     }
 
     self->vertices &= ~(1 << v);
-    return PyBool_FromLong(1);
+    Py_RETURN_NONE;
+}
+
+static PyObject *add_edge(AdjacencyList *self, PyObject *args) {
+    int v, u;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "ii", &v, &u);
+    }
+    PyList_Append(self->adj_list[v], PyLong_FromLong(u));
+    PyList_Sort(self->adj_list[u]);
+
+    PyList_Append(self->adj_list[u], PyLong_FromLong(v));
+    PyList_Sort(self->adj_list[v]);
+
+    Py_RETURN_NONE;
+}
+
+static PyObject *delete_edge(AdjacencyList *self, PyObject *args) {
+    int v, u;
+
+    if (args != NULL) {
+        PyArg_ParseTuple(args, "ii", &v, &u);
+    }
+
+    int idx_v = PySequence_Index(self->adj_list[u], PyLong_FromLong(v));
+    PyList_SetSlice(self->adj_list[u], idx_v, idx_v + 1, NULL);
+
+    int idx_u = PySequence_Index(self->adj_list[v], PyLong_FromLong(u));
+    PyList_SetSlice(self->adj_list[v], idx_u, idx_u + 1, NULL);
+
+    Py_RETURN_NONE;
 }
 
 static PyObject *get_ver(AdjacencyList *self) {
@@ -313,6 +344,8 @@ static PyMethodDef AdjacencyList_methods[] = {
     {"vertex_neighbors", (PyCFunction)vertex_neighbors, METH_VARARGS},
     {"add_vertex", (PyCFunction)add_vertex, METH_VARARGS},
     {"delete_vertex", (PyCFunction)delete_vertex, METH_VARARGS},
+    {"add_edge", (PyCFunction)add_edge, METH_VARARGS},
+    {"delete_edge", (PyCFunction)delete_edge, METH_VARARGS},
     {"Alist", (PyCFunction)Alist, METH_NOARGS},
     {"get_ver", (PyCFunction)get_ver, METH_NOARGS},
     {NULL, NULL}  /* Sentinel */
