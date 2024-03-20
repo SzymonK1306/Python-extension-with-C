@@ -2,18 +2,11 @@
 
 const int MAX_VERTICES = 16;
 
-// Define the struct
 typedef struct {
     PyObject_HEAD
     short vertices;
-    // int num_vertices;
-    PyObject **adj_list; // Array of Python lists (sorted adjacency lists)
+    PyObject **adj_list; 
 } AdjacencyList;
-
-// Comparator function for sorting
-int compare(const void *a, const void *b) {
-    return (*(int*)a - *(int*)b);
-}
 
 int count_bits(short num) {
     int count = 0;
@@ -24,30 +17,25 @@ int count_bits(short num) {
     return count;
 }
 
-// Define the initialization function
 static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwds) {
-    const char *g6 = "?"; // Input g6 format string
+    const char *g6 = "?";
     if (!PyArg_ParseTuple(args, "s", &g6)) {
         return -1;
     }
     
-    // Determine the number of vertices from g6 format
     int len = strlen(g6);
-    // self->num_vertices = g6[0] - 63;
 
     for (int i = 0; i < g6[0] - 63; i++) {
         self->vertices = self->vertices << 1;
         self->vertices = self->vertices | 0x0001;
     }
 
-    // Allocate memory for the adjacency list
     self->adj_list = (PyObject **)malloc(MAX_VERTICES * sizeof(PyObject *));
     if (self->adj_list == NULL) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory");
         return -1;
     }
 
-    // Initialize adjacency lists as empty Python lists
     for (int i = 0; i < MAX_VERTICES; ++i) {
         self->adj_list[i] = PyList_New(0);
         if (self->adj_list[i] == NULL) {
@@ -56,8 +44,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
         }
     }
 
-    // Decode g6 format and populate adjacency lists
-    int k = 0; // Index to traverse g6 string
+    int k = 0; 
     int i = 1;
     for (int v = 1; v < count_bits(self->vertices); ++v) {
         for (int u = 0; u < v; ++u) {
@@ -77,7 +64,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
         }
     }
 
-    // Sort adjacency lists
+    // Sort list
     for (int i = 0; i < count_bits(self->vertices); ++i) {
         PyList_Sort(self->adj_list[i]);
     }
@@ -85,7 +72,7 @@ static int AdjacencyList_init(AdjacencyList *self, PyObject *args, PyObject *kwd
     return 0;
 }
 
-// Destructor to deallocate memory
+// Destructor 
 static void AdjacencyList_dealloc(AdjacencyList *self) {
     for (int i = 0; i < MAX_VERTICES; ++i) {
         Py_DECREF(self->adj_list[i]);
@@ -94,12 +81,10 @@ static void AdjacencyList_dealloc(AdjacencyList *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-// Implementation of number_of_vertices method
 static PyObject *number_of_vertices(AdjacencyList *self) {
     return PyLong_FromLong(count_bits(self->vertices));
 }
 
-// Implementation of number_of_vertices method
 static PyObject *Alist(AdjacencyList *self) {
     return self->adj_list[1];
 }
@@ -110,16 +95,6 @@ static PyObject *vertices(AdjacencyList *self) {
         return NULL;
     }
     short num = self->vertices;
-    // int i = MAX_VERTICES - 1;
-    // while (num) {
-    //     if (num & 1)
-    //     {
-    //         PyObject *item = PyLong_FromLong(i);
-    //         PySet_Add(vertices_set, item);
-    //         Py_DECREF(item);
-    //     }   
-    //     num >>= 1;    
-    // }
 
     for (int i = 0; i < MAX_VERTICES; i++) {
         if ((num >> i) & 1) {
@@ -128,15 +103,6 @@ static PyObject *vertices(AdjacencyList *self) {
             Py_DECREF(item);
         }
     }
-    // for (int i = 0; i < MAX_VERTICES; ++i) {
-        
-    //     if (PyList_Size(self->adj_list[i]) != 0)
-    //     {
-    //         PyObject *item = PyLong_FromLong(i);
-    //         PySet_Add(vertices_set, item);
-    //         Py_DECREF(item);
-    //     };
-    // }
 
     return vertices_set;
 }
@@ -153,35 +119,28 @@ static PyObject *number_of_edges(AdjacencyList *self) {
 static PyObject *edges(AdjacencyList *self) {
     PyObject *edges_set = PySet_New(NULL);
     if (edges_set == NULL) {
-        // Handle memory allocation failure
         return NULL;
     }
     for (int i = 0; i < MAX_VERTICES; ++i) {
         for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j) {
-            // Retrieve the vertex j from the adjacency list
             PyObject *vertex_j = PyList_GetItem(self->adj_list[i], j);
-            if (vertex_j == NULL) {
-                // Handle error if PyList_GetItem fails
+            if (vertex_j == NULL) { // error handle
                 Py_DECREF(edges_set);
                 return NULL;
             }
             int smaller_vertex = i < PyLong_AsLong(vertex_j) ? i : PyLong_AsLong(vertex_j);
             int larger_vertex = i < PyLong_AsLong(vertex_j) ? PyLong_AsLong(vertex_j) : i;
 
-            // Create a tuple (smaller_vertex, larger_vertex)
             PyObject *edge = PyTuple_Pack(2, PyLong_FromLong(smaller_vertex), PyLong_FromLong(larger_vertex));
 
             if (edge == NULL) {
-                // Handle error if PyTuple_Pack fails
                 Py_DECREF(edges_set);
                 return NULL;
             }
 
-            // Add the tuple to the set
             int result = PySet_Add(edges_set, edge);
-            Py_DECREF(edge); // We no longer need the reference to edge
+            Py_DECREF(edge); 
             if (result == -1) {
-                // Handle error if PySet_Add fails
                 Py_DECREF(edges_set);
                 return NULL;
             }
@@ -274,24 +233,6 @@ static PyObject *delete_vertex(AdjacencyList *self, PyObject *args) {
                 PyList_SetSlice(self->adj_list[i], idx, idx + 1, NULL);
             }
         }
-        // if (PyList_Size(self->adj_list[i]) == 0)
-        //     continue;
-        // PyObject *tmp_list = PyList_New(0);
-
-        // for (int j = 0; j < PyList_Size(self->adj_list[i]); ++j)
-        // {
-        //     PyObject *cur_ver_obj = PyList_GetItem(self->adj_list[i], j);
-        //     int current_vertex = PyLong_AsLong(cur_ver_obj);
-        //     Py_DECREF(cur_ver_obj);
-
-        //     if (current_vertex != v)
-        //     {
-        //         PyList_Append(tmp_list, PyLong_FromLong(current_vertex));
-        //     }
-        // }
-        // Py_DECREF(self->adj_list[i]);
-        // self->adj_list[i] = tmp_list;
-        // Py_DECREF(tmp_list);
     }
 
     self->vertices &= ~(1 << v);
